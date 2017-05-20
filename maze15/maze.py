@@ -104,8 +104,8 @@ class Game:
     def play(self):
         move_directions = {
             pygame.K_LEFT: (0, -1),
-            pygame.K_RIGHT: (0, 1),
             pygame.K_UP: (-1, 0),
+            pygame.K_RIGHT: (0, 1),
             pygame.K_DOWN: (1, 0),
         }
         # Event loop
@@ -117,7 +117,7 @@ class Game:
                     self.move_if_possible(move_directions[event.key])
 
     def move_if_possible(self, direction):
-        new_position = tuple(map(operator.add, self.player.current_position, direction))
+        new_position = move_point(self.player.current_position, direction)
         if new_position[0] >= 0 and self.maze_layout.shape[0] > 0 <= new_position[1] < self.maze_layout.shape[1]:
             if self.maze_layout[new_position] == 0:
                 self.screen.blit(self.background, self.player.rect, self.player.rect)
@@ -163,10 +163,10 @@ def generate_maze_layout(config):
                 break
 
             probabilities_for_directions = {
-                'L': (0.5, 0.25, 0.0, 0.25),
-                'U': (0.25, 0.5, 0.25, 0.0),
-                'R': (0.0, 0.25, 0.5, 0.25),
-                'D': (0.25, 0.0, 0.25, 0.5)
+                (0, -1): (0.5, 0.25, 0.0, 0.25),
+                (-1, 0): (0.25, 0.5, 0.25, 0.0),
+                (0, 1): (0.0, 0.25, 0.5, 0.25),
+                (1, 0): (0.25, 0.0, 0.25, 0.5)
             }
 
             substarting_point = move_point(substarting_point, next_direction)
@@ -175,9 +175,9 @@ def generate_maze_layout(config):
 
 
 def choose_random_direction(probabilities):
-    DIRECTIONS = ['L', 'U', 'R', 'D']
+    directions = [(0, -1), (-1, 0), (0, 1), (1, 0)]
     bins = numpy.cumsum(probabilities)
-    return DIRECTIONS[numpy.digitize(numpy.random.mtrand.random_sample(1), bins)]
+    return directions[numpy.digitize(numpy.random.mtrand.random_sample(1), bins)]
 
 
 def generate_substarting_points(n_starting_points, maze_size):
@@ -195,16 +195,7 @@ def generate_substarting_points(n_starting_points, maze_size):
 
 
 def move_point(point, direction):
-    if direction == 'L':
-        return point[0], point[1] - 1
-    elif direction == 'U':
-        return point[0] - 1, point[1]
-    elif direction == 'R':
-        return point[0], point[1] + 1
-    elif direction == 'D':
-        return point[0] + 1, point[1]
-    else:
-        raise ValueError('Invalid direction: {1}'.format(direction))
+    return tuple(map(operator.add, point, direction))
 
 
 def at_edge(substarting_point, maze_size):
