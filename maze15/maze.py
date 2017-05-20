@@ -7,6 +7,9 @@ import numpy
 import pygame
 
 MAZE_SIZE = (16, 16)
+N_STARTING_POINTS = 4
+REMAIN_ALIVE_PROBABILITY = 0.98
+BIRTH_PROBABILITY = 0.05
 PIXELS_FOR_CELL = 25
 EXTRA_SPACE = (0, 0)
 
@@ -33,7 +36,7 @@ class MazeWall(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         self.image, self.rect = load_png('brick.png')
         self.rect = pygame.Rect((position[1] * PIXELS_FOR_CELL, position[0] * PIXELS_FOR_CELL),
-                            (PIXELS_FOR_CELL, PIXELS_FOR_CELL))
+                                (PIXELS_FOR_CELL, PIXELS_FOR_CELL))
         screen = pygame.display.get_surface()
         self.area = screen.get_rect()
 
@@ -44,14 +47,16 @@ class Player(pygame.sprite.Sprite):
         self.image, self.rect = load_png('bat.png')
         self.current_position = position
         self.rect = pygame.Rect((position[1] * PIXELS_FOR_CELL, position[0] * PIXELS_FOR_CELL),
-                            (PIXELS_FOR_CELL, PIXELS_FOR_CELL))
+                                (PIXELS_FOR_CELL, PIXELS_FOR_CELL))
         screen = pygame.display.get_surface()
         self.area = screen.get_rect()
 
     def move(self, new_position):
         self.current_position = new_position
-        self.rect = pygame.Rect((self.current_position[1] * PIXELS_FOR_CELL, self.current_position[0] * PIXELS_FOR_CELL),
-                            (PIXELS_FOR_CELL, PIXELS_FOR_CELL))
+        self.rect = pygame.Rect(
+            (self.current_position[1] * PIXELS_FOR_CELL, self.current_position[0] * PIXELS_FOR_CELL),
+            (PIXELS_FOR_CELL, PIXELS_FOR_CELL)
+        )
         print self.current_position
 
 
@@ -70,34 +75,34 @@ class Game:
 
         self.new_game()
 
-    def new_game(self):
+    def render(self):
         self.screen.blit(self.background, (0, 0))
-
-        self.maze, self.current_position = generate_maze(MAZE_SIZE)
-
-        for i in range(self.maze.shape[0]):
-            for j in range(self.maze.shape[1]):
-                if self.maze[i][j] == 1:
-                    wall = MazeWall((i, j))
-                    wall_sprite = pygame.sprite.RenderPlain(wall)
+        for i in range(self.maze_layout.shape[0]):
+            for j in range(self.maze_layout.shape[1]):
+                if self.maze_layout[i][j] == 1:
+                    wall_sprite = pygame.sprite.RenderPlain(MazeWall((i, j)))
                     wall_sprite.draw(self.screen)
 
-        self.player = Player(self.current_position)
         self.player_sprite = pygame.sprite.RenderPlain(self.player)
         self.player_sprite.draw(self.screen)
-
         pygame.display.flip()
 
-        self.game()
+
+    def new_game(self):
+        self.maze_layout, player_init_position = generate_maze_layout(
+            MazeGenerationConfig(MAZE_SIZE, N_STARTING_POINTS,
+                                 REMAIN_ALIVE_PROBABILITY, BIRTH_PROBABILITY)
+        )
+        self.player = Player(player_init_position)
+        self.render()
+        self.play()
 
     def update(self):
         self.player_sprite.draw(self.screen)
         pygame.display.flip()
 
-
-
-    def game(self):
-        TO_SLEEP = 0.1
+    def play(self):
+        to_sleep = 0.1
         # Event loop
         while True:
             for event in pygame.event.get():
@@ -108,24 +113,24 @@ class Game:
             if keys[pygame.K_LEFT]:
                 direction = (0, -1)
                 self.move_if_possible(direction)
-                time.sleep(TO_SLEEP)
+                time.sleep(to_sleep)
             if keys[pygame.K_RIGHT]:
                 direction = (0, 1)
                 self.move_if_possible(direction)
-                time.sleep(TO_SLEEP)
+                time.sleep(to_sleep)
             if keys[pygame.K_UP]:
                 direction = (-1, 0)
                 self.move_if_possible(direction)
-                time.sleep(TO_SLEEP)
+                time.sleep(to_sleep)
             if keys[pygame.K_DOWN]:
                 direction = (1, 0)
                 self.move_if_possible(direction)
-                time.sleep(TO_SLEEP)
+                time.sleep(to_sleep)
 
     def move_if_possible(self, direction):
         new_position = tuple(map(operator.add, self.player.current_position, direction))
-        if new_position[0] >= 0 and self.maze.shape[0] > 0 <= new_position[1] < self.maze.shape[1]:
-            if self.maze[new_position] == 0:
+        if new_position[0] >= 0 and self.maze_layout.shape[0] > 0 <= new_position[1] < self.maze_layout.shape[1]:
+            if self.maze_layout[new_position] == 0:
                 self.screen.blit(self.background, self.player.rect, self.player.rect)
                 self.player.move(new_position)
                 self.update()
@@ -133,74 +138,93 @@ class Game:
             self.new_game()
 
 
-def _weighted_value(values, probabilities):
-    bins = numpy.cumsum(probabilities)
-    return values[numpy.digitize(numpy.random.mtrand.random_sample(1), bins)]
+class MazeGenerationConfig:
+    def __init__(self, maze_size, n_starting_points, remain_alive_probability, birth_probability):
+        self.maze_size = maze_size
+        self.n_starting_points = n_starting_points
+        self.remain_alive_probability = remain_alive_probability
+        self.birth_probability = birth_probability
 
 
-def generate_maze(maze_size):
+def generate_maze_layout(config):
     """
     Puts walls and passages, chooses starting point of a maze
+    :type config: MazeGenerationConfig
     """
-    hors = maze_size[0]
-    vers = maze_size[1]
-    # init maze with 1
-    maze = numpy.zeros(hors * vers).reshape(maze_size)
-    for i in range(hors):
-        for j in range(vers):
-            maze[i][j] = 1
 
-    # choose starting point
-    center = (hors / 2, vers / 2)
-    hors_for_start = hors / 2
-    vers_for_start = vers / 2
-    N_STARTING_POINTS = 4
-    substarting_points = []
-    for i in range(N_STARTING_POINTS):
-        starting_point = (random.randint(center[0] - hors_for_start / 2, center[0] + hors_for_start / 2),
-                          random.randint(center[1] - vers_for_start / 2, center[1] + vers_for_start / 2))
-        substarting_points.append(starting_point)
-    INITIAL_DEATH_RATE = 20
-    INITIAL_BIRTH_RATE = INITIAL_DEATH_RATE * 2
-    death_rate = INITIAL_DEATH_RATE
-    birth_rate = INITIAL_BIRTH_RATE
-    DIRECTIONS = ['L', 'U', 'R', 'D']
-    next_direction = _weighted_value(DIRECTIONS, (0.25, 0.25, 0.25, 0.25))
+    maze_layout = numpy.ones(config.maze_size[0] * config.maze_size[1]).reshape(config.maze_size)
+    substarting_points = generate_substarting_points(config.n_starting_points, config.maze_size)
+    starting_point = substarting_points[0]
+
+    last_point = len(substarting_points) > 1
+
+    next_direction = choose_random_direction((0.25, 0.25, 0.25, 0.25))
     while substarting_points:
         substarting_point = substarting_points.pop()
         if not substarting_points:
-            death_rate = 0
-        alive_index = 1000
-        birth_index = 1000
-        while alive_index > death_rate:  # one way in this loop
-            if birth_index < birth_rate:
-                birth_rate = birth_rate * 4 / 5
-                death_rate = INITIAL_DEATH_RATE
+            last_point = True
+        birth_probability = config.birth_probability
+        while true_with_probability(config.remain_alive_probability) or last_point:  # one way in this loop
+            if true_with_probability(birth_probability):
+                birth_probability = birth_probability * 0.8
                 substarting_points.append(substarting_point)
-
-            maze[substarting_point] = 0
-
-            # stop if the edge is reached
-            if substarting_point[0] in [0, hors - 1] or substarting_point[1] in [0, vers - 1]:
+                last_point = False
+            maze_layout[substarting_point] = 0
+            if at_edge(substarting_point, config.maze_size):
                 break
 
-            if next_direction == 'L':
-                substarting_point = (substarting_point[0], substarting_point[1] - 1)
-                next_direction = _weighted_value(DIRECTIONS, (0.5, 0.25, 0.0, 0.25))
-            elif next_direction == 'U':
-                substarting_point = (substarting_point[0] - 1, substarting_point[1])
-                next_direction = _weighted_value(DIRECTIONS, (0.25, 0.5, 0.25, 0.0))
-            elif next_direction == 'R':
-                substarting_point = (substarting_point[0], substarting_point[1] + 1)
-                next_direction = _weighted_value(DIRECTIONS, (0.0, 0.25, 0.5, 0.25))
-            else:
-                substarting_point = (substarting_point[0] + 1, substarting_point[1])
-                next_direction = _weighted_value(DIRECTIONS, (0.25, 0.0, 0.25, 0.5))
-            alive_index = random.randint(1, 1000)
-            birth_index = random.randint(1, 800)
+            probabilities_for_directions = {
+                'L': (0.5, 0.25, 0.0, 0.25),
+                'U': (0.25, 0.5, 0.25, 0.0),
+                'R': (0.0, 0.25, 0.5, 0.25),
+                'D': (0.25, 0.0, 0.25, 0.5)
+            }
 
-    print maze, starting_point
-    return maze, starting_point
+            substarting_point = move_point(substarting_point, next_direction)
+            next_direction = choose_random_direction(probabilities_for_directions[next_direction])
+    return maze_layout, starting_point
+
+
+def choose_random_direction(probabilities):
+    DIRECTIONS = ['L', 'U', 'R', 'D']
+    bins = numpy.cumsum(probabilities)
+    return DIRECTIONS[numpy.digitize(numpy.random.mtrand.random_sample(1), bins)]
+
+
+def generate_substarting_points(n_starting_points, maze_size):
+    substarting_points = []
+    center = (maze_size[0] / 2, maze_size[1] / 2)
+    hors_for_start = maze_size[0] / 2
+    vers_for_start = maze_size[1] / 2
+    for i in range(n_starting_points):
+        starting_point = (random.randint(center[0] - hors_for_start / 2,
+                                         center[0] + hors_for_start / 2),
+                          random.randint(center[1] - vers_for_start / 2,
+                                         center[1] + vers_for_start / 2))
+        substarting_points.append(starting_point)
+    return substarting_points
+
+
+def move_point(point, direction):
+    if direction == 'L':
+        return point[0], point[1] - 1
+    elif direction == 'U':
+        return point[0] - 1, point[1]
+    elif direction == 'R':
+        return point[0], point[1] + 1
+    elif direction == 'D':
+        return point[0] + 1, point[1]
+    else:
+        raise ValueError('Invalid direction: {1}'.format(direction))
+
+
+def at_edge(substarting_point, maze_size):
+    return substarting_point[0] in [0, maze_size[0] - 1] \
+           or substarting_point[1] in [0, maze_size[1] - 1]
+
+
+def true_with_probability(probability):
+    return random.random() < probability
 
 
 if __name__ == '__main__':
