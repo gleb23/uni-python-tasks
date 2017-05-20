@@ -99,3 +99,7 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+#pycharm files
+/maze15/.idea/workspace.xml
+/maze15/.idea/tasks.xml
