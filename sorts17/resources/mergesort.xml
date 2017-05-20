@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+
+<sorttype>
+    <name>mergesort</name><code>
+def assemble(list1, list2):
+    result = []
+    iter1 = iter2 = 0
+    while (list1.__len__() > iter1) and (list2.__len__() > iter2):
+        if list2[iter2] > list1[iter1]:
+            result.append(list1[iter1])
+            iter1 += 1
+        else:
+            result.append(list2[iter2])
+            iter2 += 1
+    if list1.__len__() > iter1:
+        result.extend(list1[iter1:])
+    if list2.__len__() > iter2:
+        result.extend(list2[iter2:])
+    return result
+
+def sort(list):
+    n = list.__len__()
+    if n == 1:
+        return list
+    else:
+        return assemble(sort(list[:n/2]), sort(list[n/2:]))</code>
+</sorttype>
