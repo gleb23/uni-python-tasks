@@ -102,30 +102,19 @@ class Game:
         pygame.display.flip()
 
     def play(self):
-        to_sleep = 0.1
+        move_directions = {
+            pygame.K_LEFT: (0, -1),
+            pygame.K_RIGHT: (0, 1),
+            pygame.K_UP: (-1, 0),
+            pygame.K_DOWN: (1, 0),
+        }
         # Event loop
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return
-
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_LEFT]:
-                direction = (0, -1)
-                self.move_if_possible(direction)
-                time.sleep(to_sleep)
-            if keys[pygame.K_RIGHT]:
-                direction = (0, 1)
-                self.move_if_possible(direction)
-                time.sleep(to_sleep)
-            if keys[pygame.K_UP]:
-                direction = (-1, 0)
-                self.move_if_possible(direction)
-                time.sleep(to_sleep)
-            if keys[pygame.K_DOWN]:
-                direction = (1, 0)
-                self.move_if_possible(direction)
-                time.sleep(to_sleep)
+                elif event.type == pygame.KEYDOWN:
+                    self.move_if_possible(move_directions[event.key])
 
     def move_if_possible(self, direction):
         new_position = tuple(map(operator.add, self.player.current_position, direction))
