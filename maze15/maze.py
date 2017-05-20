@@ -118,12 +118,12 @@ class Game:
 
     def move_if_possible(self, direction):
         new_position = move_point(self.player.current_position, direction)
-        if new_position[0] >= 0 and self.maze_layout.shape[0] > 0 <= new_position[1] < self.maze_layout.shape[1]:
+        try:
             if self.maze_layout[new_position] == 0:
                 self.screen.blit(self.background, self.player.rect, self.player.rect)
                 self.player.move(new_position)
                 self.update()
-        else:
+        except IndexError:
             self.new_game()
 
 
